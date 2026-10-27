@@ -10,14 +10,23 @@ const { getUtcTodayString, addDays } = require('../../src/utils/dates');
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryServer.create({
+    binary: {
+      version: '6.0.14',
+    },
+    instance: {
+      launchTimeout: 60000,
+    },
+  });
   const uri = mongoServer.getUri();
   await mongoose.connect(uri);
-});
+}, 60000);
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
 });
 
 beforeEach(async () => {
