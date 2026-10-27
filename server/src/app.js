@@ -15,44 +15,59 @@ const statsRoutes = require('./routes/statsRoutes');
 
 const app = express();
 
-// Security HTTP headers
+// Security HTTP headers with assets policy relaxed for Vite bundled scripts & styles
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Allows flexible inline fonts & icons
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false,
   })
 );
 
-// CORS configuration - resilient to trailing slashes and multi-origins
+// ---------------------------------------------------------------------------
+// 1. Serve Frontend Static Assets First (Never blocked by API CORS checks)
+// ---------------------------------------------------------------------------
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+}
+
+// ---------------------------------------------------------------------------
+// 2. CORS configuration specifically for /api endpoints
+// ---------------------------------------------------------------------------
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. mobile apps, curl, or same-origin browser requests)
+    // Same-origin browser requests, curl, or mobile requests have no origin header
     if (!origin) return callback(null, true);
 
     const cleanOrigin = origin.replace(/\/$/, '');
+    const isRender = cleanOrigin.endsWith('.onrender.com');
+    const isLocalhost = cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1');
+
     const configuredOrigins = config.CLIENT_ORIGIN
       ? config.CLIENT_ORIGIN.split(',').map((o) => o.trim().replace(/\/$/, ''))
       : [];
 
-    const allowedOrigins = [
-      ...configuredOrigins,
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-    ];
-
     if (
+      !config.CLIENT_ORIGIN ||
       config.CLIENT_ORIGIN === '*' ||
-      allowedOrigins.includes(cleanOrigin) ||
+      isRender ||
+      isLocalhost ||
+      configuredOrigins.includes(cleanOrigin) ||
       config.NODE_ENV !== 'production'
     ) {
       return callback(null, true);
     }
-    return callback(new Error(`Cross-Origin Request Blocked by CORS policy: ${origin}`));
+
+    // Do not throw Error; simply omit Access-Control-Allow-Origin header
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
-app.use(cors(corsOptions));
+
+// Mount CORS only on /api routes
+app.use('/api', cors(corsOptions));
 
 // Body parsers with payload size limit
 app.use(express.json({ limit: '10kb' }));
@@ -102,13 +117,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/habits', habitsRoutes);
 app.use('/api/stats', statsRoutes);
 
-// In production or when client/dist exists, serve frontend static assets
-const clientDistPath = path.resolve(__dirname, '../../client/dist');
+// ---------------------------------------------------------------------------
+// 3. SPA Fallback for client-side navigation (Dashboard, /habits, etc.)
+// ---------------------------------------------------------------------------
 if (fs.existsSync(clientDistPath)) {
-  app.use(express.static(clientDistPath));
-
-  // SPA fallback for all frontend client navigation
   app.get('*', (req, res, next) => {
+    // If it's an unmatched /api call, let notFound middleware handle it
     if (req.originalUrl.startsWith('/api')) {
       return next();
     }
