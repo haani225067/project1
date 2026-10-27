@@ -15,22 +15,31 @@ const app = express();
 // Security HTTP headers
 app.use(helmet());
 
-// CORS configuration - restricted to CLIENT_ORIGIN
+// CORS configuration - resilient to trailing slashes and multi-origins
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (e.g. mobile apps, curl, or server-to-server tests)
     if (!origin) return callback(null, true);
 
+    const cleanOrigin = origin.replace(/\/$/, '');
+    const configuredOrigins = config.CLIENT_ORIGIN
+      ? config.CLIENT_ORIGIN.split(',').map((o) => o.trim().replace(/\/$/, ''))
+      : [];
+
     const allowedOrigins = [
-      config.CLIENT_ORIGIN,
+      ...configuredOrigins,
       'http://localhost:5173',
       'http://127.0.0.1:5173',
     ];
 
-    if (allowedOrigins.includes(origin) || config.NODE_ENV !== 'production') {
+    if (
+      config.CLIENT_ORIGIN === '*' ||
+      allowedOrigins.includes(cleanOrigin) ||
+      config.NODE_ENV !== 'production'
+    ) {
       return callback(null, true);
     }
-    return callback(new Error('Cross-Origin Request Blocked by CORS policy'));
+    return callback(new Error(`Cross-Origin Request Blocked by CORS policy: ${origin}`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
