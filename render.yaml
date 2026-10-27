@@ -40,3 +40,4 @@ services:
     envVars:
       - key: VITE_API_URL
         sync: false # Input your backend API URL + /api (e.g. https://habit-tracker-api.onrender.com/api)
+
