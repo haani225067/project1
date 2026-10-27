@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path');
+const fs = require('fs');
 const config = require('./config/env');
 const sanitizeInput = require('./middleware/sanitize');
 const notFound = require('./middleware/notFound');
@@ -13,12 +15,16 @@ const statsRoutes = require('./routes/statsRoutes');
 const app = express();
 
 // Security HTTP headers
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Allows flexible inline fonts & icons
+  })
+);
 
 // CORS configuration - resilient to trailing slashes and multi-origins
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. mobile apps, curl, or server-to-server tests)
+    // Allow requests with no origin (e.g. mobile apps, curl, or same-origin browser requests)
     if (!origin) return callback(null, true);
 
     const cleanOrigin = origin.replace(/\/$/, '');
@@ -71,7 +77,25 @@ app.use('/api/auth', authRoutes);
 app.use('/api/habits', habitsRoutes);
 app.use('/api/stats', statsRoutes);
 
-// Undefined route 404 handler
+// In production or when client/dist exists, serve frontend static assets
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+
+  // SPA fallback for all frontend client navigation
+  app.get('*', (req, res, next) => {
+    if (req.originalUrl.startsWith('/api')) {
+      return next();
+    }
+    const indexFile = path.join(clientDistPath, 'index.html');
+    if (fs.existsSync(indexFile)) {
+      return res.sendFile(indexFile);
+    }
+    next();
+  });
+}
+
+// Undefined route 404 handler (for unmatched /api calls)
 app.use(notFound);
 
 // Central error handler

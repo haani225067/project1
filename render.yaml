@@ -1,13 +1,13 @@
 services:
   # ---------------------------------------------------------------------------
-  # 1. Backend REST API (Node.js + Express + Mongoose)
+  # Full-Stack Web Service (Node.js + Express API + React Vite Client)
+  # Deploys as a single unified service: Zero CORS issues, 100% Free Tier compatible
   # ---------------------------------------------------------------------------
   - type: web
-    name: habit-tracker-api
+    name: habit-tracker
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm install
+    buildCommand: npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -16,28 +16,10 @@ services:
       - key: PORT
         value: 10000
       - key: MONGODB_URI
-        sync: false # Input your MongoDB Atlas connection string in Render Dashboard
+        sync: false # Set your MongoDB Atlas connection string in the Render Dashboard
       - key: JWT_SECRET
-        generateValue: true # Automatically generates a secure random 32-character key
+        generateValue: true # Render auto-generates a secure 32-character random key
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: CLIENT_ORIGIN
-        sync: false # Input your frontend live URL (e.g. https://habit-tracker-client.onrender.com)
-
-  # ---------------------------------------------------------------------------
-  # 2. Frontend Web App (React + Vite SPA)
-  # ---------------------------------------------------------------------------
-  - type: static
-    name: habit-tracker-client
-    rootDir: client
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    routes:
-      # SPA rewrite rule so refreshing deep links (/habits/123) works smoothly
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        sync: false # Input your backend API URL + /api (e.g. https://habit-tracker-api.onrender.com/api)
-
+        value: '*'
