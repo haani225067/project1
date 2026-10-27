@@ -4,11 +4,10 @@
   "private": true,
   "description": "Full-stack Habit Tracker with Streaks MERN application",
   "scripts": {
-    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "build": "npm install --prefix server --include=dev && npm install --prefix client --include=dev && npm run build --prefix client",
     "start": "node server/src/server.js",
     "test": "npm test --prefix server",
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client"
   }
 }
-
