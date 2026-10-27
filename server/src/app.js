@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const config = require('./config/env');
@@ -60,16 +61,40 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // Sanitize request bodies and parameters against NoSQL operator injection
 app.use(sanitizeInput);
 
-// Health check endpoint
+// Health check endpoint (always accessible for Render keep-alive & monitoring)
 app.get('/api/health', (req, res) => {
+  const dbStatus =
+    mongoose.connection.readyState === 1
+      ? 'connected'
+      : mongoose.connection.readyState === 2
+      ? 'connecting'
+      : 'disconnected';
+
   res.status(200).json({
     success: true,
     message: 'Habit Tracker API is healthy and operational',
     data: {
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
+      database: dbStatus,
     },
   });
+});
+
+// Database readiness check for API calls (excluding /health)
+app.use('/api', (req, res, next) => {
+  if (config.NODE_ENV === 'test') return next();
+  if (req.path === '/health') return next();
+
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message:
+        'Database connection in progress. If this message persists, please check your MONGODB_URI connection string in Render Dashboard Environment variables.',
+      data: null,
+    });
+  }
+  next();
 });
 
 // API Routes

@@ -4,14 +4,15 @@ const config = require('./config/env');
 
 const startServer = async () => {
   try {
-    // Connect to database
-    await connectDB();
-
+    // Start HTTP server immediately so Render detects port binding
     const server = app.listen(config.PORT, () => {
       console.log(
-        `[Server] Habit Tracker API running in ${config.NODE_ENV} mode on http://localhost:${config.PORT}`
+        `[Server] Habit Tracker running in ${config.NODE_ENV} mode on port ${config.PORT}`
       );
     });
+
+    // Connect to database with automatic retry
+    connectDB();
 
     // Graceful shutdown handling
     const gracefulShutdown = (signal) => {
